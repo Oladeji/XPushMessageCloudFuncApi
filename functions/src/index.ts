@@ -6,55 +6,33 @@ admin.initializeApp()
 // Start writing Firebase Functions
 // https://firebase.google.com/docs/functions/typescript
 
-// export const helloWorld = functions.https.onRequest((request, response) => {
-//   functions.logger.info("Hello logs!", {structuredData: true});
-//   response.send("Hello from Firebase!");
-// });
-//recursive 
-// export const OngetPatient =
-// functions.firestore.document("Patients/{id}").onCreate( async (snap,context)=>{
-//     //const id : string =snap.data().id
-//     const Name : string =snap.data().Name
-//     const School : string =snap.data().School
-//   //  await admin.firestore().doc(`Patients/${id}`).set
-//      await admin.firestore().collection("Patients").add
-//         ({
-//             Name : Name,
-//             School:School
-//         });
-    
-//    console.log(Name,School)
-//    return  ({
-//             Name : Name,
-//             School:School
-//         })
-//    })
+
+export const OnMessagePatientSendFCM2 =
+  functions.firestore.document("PatientsMessages/{id}").onCreate( async (snap,context)=>{
+   try {
+           const AllPromises:  Promise<string>[]= []
+           const devicearray =  await  admin.firestore().collection('RegisteredDevices') 
+                         .where("PatientNo",'==',snap.data().PatientNo)
+                         .where("HospitalId",'==',snap.data().HospitalId).get() ;    
+           devicearray.docs.forEach(Patient => {                            
+                                          const mesage ={                                  
+                                             notification: {title:snap.data().title, body: snap.data().body    },                           
+                                             token: Patient.data().FCMtoken // token :  Patient.data().token              
+                                          } 
+                                          const apromis =   admin.messaging().send(mesage);
+                                          AllPromises.push(apromis);
+                                          
+                                        });
+     return  Promise.all(AllPromises);
+   } 
+   catch (error) {
+     return error;  
+   } 
+}
+);
 
 
-// async function   GetToken( PatientNo :any ,HospitalId:any)
-// {
-//   const tokens: FirebaseFirestore.DocumentData [] =[]
-//   return await admin.firestore().collection('RegisteredDevices')
-//                  .where("PatientNo",'==',PatientNo)
-//                  .where("HospitalId",'==',HospitalId)
-//                  .get().then(        
-//                    snapshot => {
-//                                   snapshot.docs.forEach(device => {
-//                                       //const appObj = { devices: device.data() }
-//                                       //tokens.push(appObj)
-//                                       tokens.push(device.data())
-//                                     })
-
-//                           return tokens
-//                           }                   
-//                         ) .catch(err=>{console.log(err);
-//                         // res.status(500).send(err) 
-//                          return ({id: err});
-//                          })
-
-
-// }
- async function   GetToken( PatientNo :any ,HospitalId:any):Promise< FirebaseFirestore.QuerySnapshot<FirebaseFirestore.DocumentData>>
+async function   GetToken( PatientNo :any ,HospitalId:any):Promise< FirebaseFirestore.QuerySnapshot<FirebaseFirestore.DocumentData>>
 {
   //var    data : FirebaseFirestore.QuerySnapshot<FirebaseFirestore.DocumentData>;
     return  await  admin.firestore().collection('RegisteredDevices')
@@ -64,17 +42,8 @@ admin.initializeApp()
      
 }
 
-// async  function   GetTokenold( PatientNo :any ,HospitalId:any): FirebaseFirestore.QuerySnapshot<FirebaseFirestore.DocumentData>
-// {
-//   var    data : Promise<FirebaseFirestore.QuerySnapshot<FirebaseFirestore.DocumentData>>;
-//    var    data2 : FirebaseFirestore.QuerySnapshot<FirebaseFirestore.DocumentData>;
-//     data2 =  await  admin.firestore().collection('RegisteredDevices')
-//                  .where("PatientNo",'==',PatientNo)
-//                  .where("HospitalId",'==',HospitalId)
-//                  .get().then( p=> {return  p});//.catch (err=>{console.log(err)});
-//   // data.then( x =>{data2=x;})
-//    return data2;
-// }
+
+
 
 export const OnMessagePatientSendFCM =
 functions.firestore.document("PatientsMessages/{id}").onCreate( async (snap,context)=>{
@@ -89,12 +58,16 @@ return  await GetToken(snap.data().PatientNo,snap.data().HospitalId).then ( (dev
                                res = res +' : '+Patient.id
                   const mesage ={   
                                
-                                notification: {title:snap.data().title,
-                                body: snap.data().body,
-                               // link:  'www.google.com'
-                                },
+                                notification: {
+                                title:snap.data().title, 
+                                body: '<a >snap.data().body'      , 
+                                data: { url:'https://yahoo.com/' }, 
+                                click_action: "https://google.com" },
+                                      
+                               fcm_options: {            link: 'https://yahoo.com/'    },                   
+                               token: Patient.data().FCMtoken
 
-                                 token: Patient.data().FCMtoken // token :  Patient.data().token              
+                                // token :  Patient.data().token              
                                 }
                                 
                    const apromis =   admin.messaging().send(mesage);
@@ -137,7 +110,7 @@ return  await GetToken(snap.data().PatientNo,snap.data().HospitalId).then ( (dev
             )
 
 
-            export const FindPatientHttp = functions.https.onRequest
+export const FindPatientHttp = functions.https.onRequest
             (     (req,res)=>
                 { 
                  const Patients: { PatientId: FirebaseFirestore.DocumentData; id: string; }[] =[]
@@ -157,155 +130,139 @@ return  await GetToken(snap.data().PatientNo,snap.data().HospitalId).then ( (dev
             }
             )
 
-            export const FindPatient = functions.https.onCall
-            (     (body,context)=>
+export const FindPatient = functions.https.onCall
+            (     
+              async (body,context)=>
                 { 
                  const Patients: { PatientId: FirebaseFirestore.DocumentData; id: string; }[] =[]
-                 return admin.firestore().collection('Patients')
-                 .where("PatientNo",'==',body.PatientNo)
-                 .where("HospitalId",'==',body.HospitalId)
-                 .get().then(        
-                   snapshot => {
-                                  snapshot.docs.forEach(Patient => {
-                                  const currentID = Patient.id
-                                  const appObj = { PatientId: Patient.data(), ['id']: currentID }
-                                  Patients.push(appObj)
-                                    })
-                          //res.send(Patients)
-                          return Patients
-                          }                   
-                        ) .catch(err=>{console.log(err);
-                        // res.status(500).send(err) 
-                         return ({id: err});
-                         })
+                 try {
+                  const snapshot = await admin.firestore().collection('Patients') 
+                                          .where("PatientNo", '==', body.PatientNo)
+                                          .where("HospitalId", '==', body.HospitalId).get();               
+                    
+                        snapshot.docs.forEach(Patient =>{
+                                              const appObj = { PatientId: Patient.data(), ['id']: Patient.id };
+                                              Patients.push(appObj);
+                                      });
+                  return Patients;
+                } catch (err) {
+                  console.log(err);
+                  return ({ id: err });
+                }
             }
             )
 
-            export const FindPatientSnap = functions.https.onCall
-            (     (body,context)=>
+export const ExistsPatientWtOpenStatus = functions.https.onCall
+            (     
+              async (body,context)=>
                 { 
-                 const Patients: { PatientId: FirebaseFirestore.DocumentData; id: string; }[] =[]
-                 return admin.firestore().collection('Patients')
-                 .where("PatientNo",'==',body.PatientNo)
-                 .where("HospitalId",'==',body.HospitalId)
-                 .get().then(        
-                   snapshot => {
-                                  snapshot.docs.forEach(Patient => {
-                                  const currentID = Patient.id
-                                  const appObj = { PatientId: Patient.data(), ['id']: currentID }
-                                  Patients.push(appObj)
-                                    })
-                          //res.send(Patients)
-                          return Patients
-                          }                   
-                        ) .catch(err=>{console.log(err);
-                        // res.status(500).send(err) 
-                         return ({id: err});
-                         })
+                 try {
+                 const p= await admin.firestore().collection('Patients') 
+                                          .where("PatientNo", '==', body.PatientNo)
+                                          .where("Status", '==','OPEN')
+                                          .where("HospitalId", '==', body.HospitalId).get();          
+
+                  return ! p.empty;
+
+                } catch (err) {
+                  console.log(err);
+                  return false;
+                }
             }
             )
 
 
-export const RegisterDevice = functions.https.onCall
-(    (body,context)=>
-     {  
+export const RegisterDeviceold = functions.https.onCall
+(    async (body,context)=>
+     {         
+      try {
+
         
-     return  admin.firestore().collection("RegisteredDevices").add
-          ({
-            
-            PatientNo:body.PatientNo,
-            RegDate:   new Date(body.RegDate)  ,
-            HospitalId:body.HospitalId,
-            Status:'OPEN',
-            FCMtoken  :body.token
-           })
-           .then( x=>
-           {
-             console.log ('In then Register Patient Part') 
-             //console.log (x) 
-             console.log(x.id)
-             console.log({id: x.id})
-             return ({id: x.id,ans:true});
-          })
-           .catch(err=>
-           {
-             console.log(err)
-             return ({id: err,ans:false});
-               
-           })
-           
-}
+                  const x = await admin.firestore().collection("RegisteredDevices").add({
+                        PatientNo: body.PatientNo,
+                        RegDate: new Date(body.RegDate),
+                        HospitalId: body.HospitalId,
+                        Status: 'OPEN',
+                        FCMtoken: body.token
+                      });
+
+                 return ({ id: x.id, ans: true });
+         } 
+      catch (err) {
+            console.log(err);
+             return ({ id: err, ans: false });
+         }          
+      }
+)
+export const RegisterDevice = functions.https.onCall
+(    async (body,context)=>
+     {         
+      try {
+           const p= await admin.firestore().collection('Patients')  .where("PatientNo", '==', body.PatientNo)         
+                               .where("PatientId", '==', body.PatientId).get();       
+            let deviceid=''   
+                if (!p.empty)
+               {
+                   const q = await admin.firestore().collection('RegisteredDevices')  .where("FCMtoken", '==', body.token)     
+                             .where("PatientId", '==', p.docs[0].id).get();    
+                   if (q.empty)
+                   {
+                      const r = await admin.firestore().collection("RegisteredDevices").add({
+                                PatientNo: body.PatientNo,  RegDate: new Date(body.RegDate), PatientId: p.docs[0].id,
+                                HospitalId: body.HospitalId,  Status: 'OPEN',     FCMtoken: body.token})       
+                       deviceid=r.id
+                   }
+                   return ({ id: p.docs[0].id, ...p.docs[0].data(), ans:true,deviceid:deviceid });
+               }
+               else  return ({ id: '', ans: false }); 
+                
+         } 
+      catch (err) { console.log(err);  return ({ id: err, ans: false })  
+         }          
+    }
 )
 
 export const RegisterPatient = functions.https.onCall
-(    (body,context)=>
-     {  
-        
-     return  admin.firestore().collection("Patients").add
-          ({
-            
-            PatientNo:body.PatientNo,
-            RegDate:   new Date(body.RegDate)  ,
-            HospitalId:body.HospitalId,
-            Status:body.Status,
-            PassCode  :body.PassCode
+(    async (body,context)=>
+     {         
+        try {
+                
 
-           })
-           .then( x=>
-           {
-             console.log ('In then Register Patient Part') 
-             //console.log (x) 
-            
-             console.log(x.id)
-             console.log({id: x.id})
-             return ({id: x.id,ans:true});
-          })
-           .catch(err=>
-           {
-             console.log(err)
-             return ({id: err,ans:false});
-               
-           })
-           
-}
+                  const x = await admin.firestore().collection("Patients").add({PatientNo: body.PatientNo,
+                     RegDate: new Date(body.RegDate),  HospitalId: body.HospitalId, Status: body.Status });
+                  const updateref= await  x.update( { PatientId: x.id});
+                  const msg = { uid:  body.HospitalId,content:'Welcome..'   ,  createdAt:   new Date(Date.now())     }
+                  const data = { uid: x.id, createdAt: admin.firestore.FieldValue.serverTimestamp(),count: 0, messages: [msg] };
+                  const chatRef =  await admin.firestore().collection('chats').doc(x.id).set(data);
+                return ({ id: x.id, chatRef:chatRef,updateref: updateref ,ans: true });
+              } 
+          catch (err) {
+                  console.log(err);
+                  return ({ id: err, ans: false });
+          }          
+      }  
 )
 
 export const MessagePatient = functions.https.onCall
-(     (body,context)=>
-     { 
-     
-    return   admin.firestore().collection("PatientsMessages").add
-          ({
-
-            PatientNo:body.PatientNo,
-            //PatientId:req.body.PatientId, // id from Patient document
-            RegDate : admin.firestore.FieldValue.serverTimestamp(),//  new Date(body.RegDate),
-            HospitalId : body.HospitalId,
-            title : body.title,
-            body : body.body,
-            icon : body.icon,
-            extrabody : body.extrabody,
-          
-            PassCode  :body.PassCode
-
-           })
-            .then( x=>
-           {
-             console.log ('In PatientsMessages Part') 
-             //console.log (x) 
-            
-             console.log(x.id)
-             console.log({id: x.id})
-             return ({id: x.id,ans:true});
-          })
-           .catch(err=>
-           {
-             console.log(err)
-             return ({id: err,ans:false});
-               
-           })
+(     async (body,context)=>
+     {     
+       try {
+             const x = await admin.firestore().collection("PatientsMessages").add({
+                        PatientNo: body.PatientNo,
+                        PatientId:body.PatientId, // id from Patient document
+                        RegDate: admin.firestore.FieldValue.serverTimestamp(),
+                        HospitalId: body.HospitalId,    icon: body.icon,
+                        title: body.title,  body: body.body,
+                        extrabody: body.extrabody
+                      });
+               return ({ id: x.id, ans: true });
+        } 
+        catch (err) {
+             console.log(err);
+             return ({ id: err, ans: false });
+         }
            
-}
+      }
 )
 
 
